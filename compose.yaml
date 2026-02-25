@@ -1,0 +1,58 @@
+services:
+  db:
+    container_name: importer_db
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${DB_PASSWORD}
+      - MSSQL_TCP_PORT=${MSSQL_PORT}
+      - MSSQL_PID=Developer
+    env_file:
+      - .env
+    platform: linux/arm64/v8
+    # platform: "linux/amd64"
+    build:
+      context: .
+      dockerfile: ./db/Dockerfile
+      args:
+        dent: "DbDent"
+        esercizio: "DbEsercizio"
+        storico: "DbStorico"
+    ports:
+      - "${MSSQL_PORT}:${MSSQL_PORT}"
+    networks:
+      - importer-network
+  bo:
+    container_name: importer_bo
+    environment:
+      - SA_PASSWORD=${DB_PASSWORD}
+      - MSSQL_TCP_PORT=${MSSQL_PORT}
+      - DB_HOST=${DB_HOST}
+      - SERVER_PORT=${SERVER_PORT}
+      - DECRYPT_PASSPHRASE=${DECRYPT_PASSPHRASE}
+    build:
+      context: .
+      dockerfile: ./bo-server/Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./container-exports:/usr/src/app/exports
+    depends_on:
+      - db
+    networks:
+      - importer-network
+  csv-parser:
+    environment:
+      - SELECTED_OPTIONS=${SELECTED_OPTIONS}
+    container_name: importer_csv-parser
+    build:
+      context: .
+      dockerfile: ./csv-parser/Dockerfile
+    volumes:
+      - ./csv-parser/archives:/usr/src/app/archives
+      - ./csv-parser/parsed-files:/usr/src/app/parsed-files
+    networks:
+      - importer-network
+
+networks:
+  importer-network:
+    driver: bridge
